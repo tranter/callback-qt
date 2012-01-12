@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<phonegap>
+    <option name="developerextras" enabled="true"/>
+    <option name="localstorage" enabled="true"/>
+    <option name="offlinestoragedatabase" enabled="true"/>
+    <option name="localcontentcanaccessremoteurls" enabled="true"/>
+    <option name="offlinewebapplicationcache" enabled="false"/>
+    <option name="plugins" enabled="false"/>
+</phonegap>

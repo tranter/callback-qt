@@ -36,6 +36,7 @@ public slots:
     void loadFinished( bool ok );
 
 private:
+    void readConfigFile();
     QWebView *m_webView;
     QDir m_workingDir;
 };

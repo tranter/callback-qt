@@ -20,14 +20,12 @@
 
 #include <QDebug>
 #include <QXmlStreamReader>
+#include <QCoreApplication>
 
 PhoneGap::PhoneGap(QWebView *webView) : QObject(webView) {
     m_webView = webView;
     // Configure web view
     m_webView->settings()->enablePersistentStorage();
-    m_webView->settings()->setAttribute( QWebSettings::LocalStorageEnabled, true );
-    m_webView->settings()->setAttribute( QWebSettings::OfflineStorageDatabaseEnabled, true );
-    m_webView->settings()->setAttribute( QWebSettings::LocalContentCanAccessRemoteUrls, true );
 
     // Listen to load finished signal
     QObject::connect( m_webView, SIGNAL(loadFinished(bool)), this, SLOT(loadFinished(bool)) );
@@ -35,14 +33,24 @@ PhoneGap::PhoneGap(QWebView *webView) : QObject(webView) {
     // Set our own WebPage class
     m_webView->setPage( new PGWebPage() );
 
-    // Determine index file path
-    m_workingDir = QDir::current();
-    QDir wwwDir( m_workingDir );
-    wwwDir.cd( "www" );
+    // Read the phonegap.xml options config file
+    readConfigFile();
 
-    // Load the correct startup file
-    m_webView->load( QUrl::fromUserInput(wwwDir.absoluteFilePath("index.html")) );
-    //m_webView->load( QUrl::fromUserInput("http://html5test.com/") );
+    if (QCoreApplication::instance()->arguments().size() == 2) {
+        // If user specified a URL on the command line, use that
+        m_webView->load( QUrl::fromUserInput(QCoreApplication::instance()->arguments()[1]));
+    } else {
+        // Otherwise load www/index.html relative to current working directory
+
+        // Determine index file path
+        m_workingDir = QDir::current();
+        QDir wwwDir( m_workingDir );
+        wwwDir.cd( "www" );
+
+        // Load the correct startup file
+        m_webView->load( QUrl::fromUserInput(wwwDir.absoluteFilePath("index.html")) );
+        //m_webView->load( QUrl::fromUserInput("http://html5test.com/") );
+    }
 }
 
 /**
@@ -102,4 +110,59 @@ void PhoneGap::loadFinished( bool ok ) {
 
     // Device is now ready to rumble
     webFrame->evaluateJavaScript( "PhoneGap.deviceready();" );
+}
+
+void PhoneGap::readConfigFile() {
+    // Change into the xml-directory
+    QDir xmlDir( m_workingDir );
+    xmlDir.cd( "xml" );
+
+    // Try to open the PhoneGap configuration file
+    QFile phoneGapXml( xmlDir.filePath("phonegap.xml") );
+    if( !phoneGapXml.open( QIODevice::ReadOnly | QIODevice::Text ) ) {
+        qDebug() << "Error loading phonegap config!";
+    } else {
+
+        // Start reading the file as a stream
+        QXmlStreamReader config;
+        config.setDevice( &phoneGapXml );
+
+        // Iterate over config file and set options according to values
+        //qDebug() << "Reading config options from phonegap.xml";
+        while (!config.atEnd()) {
+            if (config.readNext() == QXmlStreamReader::StartElement) {
+                if( config.name() == "option" ) {
+
+                    if( config.attributes().value("name") == "developerextras" ) {
+                        // Add Inspect to context menu. Useful for debug. May want to remove for production code.
+                        //qDebug() << "  Developer extras:" << config.attributes().value("enabled");
+                        m_webView->settings()->setAttribute( QWebSettings::DeveloperExtrasEnabled, config.attributes().value("enabled") == "true");
+
+                    } else if(config.attributes().value("name") == "localstorage" ) {
+                        //qDebug() << "  Local storage:" << config.attributes().value("enabled");
+                        m_webView->settings()->setAttribute( QWebSettings::LocalStorageEnabled, config.attributes().value("enabled") == "true");
+
+                    } else if(config.attributes().value("name") == "offlinestoragedatabase" ) {
+                        //qDebug() << "  Offline storage database:" << config.attributes().value("enabled");
+                        m_webView->settings()->setAttribute( QWebSettings::OfflineStorageDatabaseEnabled, config.attributes().value("enabled") == "true");
+
+                    } else if(config.attributes().value("name") == "localcontentcanaccessremoteurls" ) {
+                        //qDebug() << "  Local content can access remote urls:" << config.attributes().value("enabled");
+                        m_webView->settings()->setAttribute( QWebSettings::LocalContentCanAccessRemoteUrls, config.attributes().value("enabled") == "true");
+
+                    } else if(config.attributes().value("name") == "offlinewebapplicationcache" ) {
+                        //qDebug() << "  Offline web application cache:" << config.attributes().value("enabled");
+                        m_webView->settings()->setAttribute( QWebSettings::OfflineWebApplicationCacheEnabled, config.attributes().value("enabled") == "true");
+
+                    } else if(config.attributes().value("name") == "plugins" ) {
+                        //qDebug() << "  Plugins:" << config.attributes().value("enabled");
+                        m_webView->settings()->setAttribute( QWebSettings::PluginsEnabled, config.attributes().value("enabled") == "true");
+
+                    } else {
+                        qDebug() << "Unknown config option" << config.attributes().value("name");
+                    }
+                }
+            }
+        }
+    }
 }
